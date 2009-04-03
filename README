@@ -6,7 +6,7 @@ ln -s puppet-virtualbox virtualbox
 #
 # /etc/puppet/manifest/site.pp
 #
-# Define two virtual machines as box1 and box2 running on node client.lan
+# Define two virtual machines named box1 and box2 running on node client.lan
 #
 node 'client.lan' inherits basenetwork {
         include virtualbox
