@@ -1,0 +1,186 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          virtualbox-!!SHORTNAME
+# Required-Start:    $local_fs $remote_fs vboxdrv vboxnet
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      S 0 1 6
+# Short-Description: !!LONGNAME virtual machine
+# Description:       !!LONGNAME virtual machine hosted by VirtualBox
+### END INIT INFO
+ 
+# Author: Rolfs <@>
+# Based on /etc/init.d/skeleton from Ubuntu 8.04.
+# Do NOT "set -e"
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+SHORTNAME="<%= name %>"
+DESC="vbox: $SHORTNAME virtual machine"
+NAME=virtualbox-$SHORTNAME
+SCRIPTNAME=/etc/init.d/$NAME
+
+MANAGE_CMD=VBoxManage
+HEADLESS_CMD="VBoxHeadless"
+VM_OWNER="<%= runas %>"
+VM_NAME="<%= name %>" #This has to be the name exactly as it appears in your VirtualBox GUI control panel.
+
+RUNCMD="sudo -H -u $VM_OWNER $MANAGE_CMD"
+RUNHEADLESS="sudo -H -u $VM_OWNER $HEADLESS_CMD"
+#RUNCMD="$MANAGE_CMD"
+
+# Read configuration variable file if it is present
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+ 
+# Load the VERBOSE setting and other rcS variables
+[ -f /etc/default/rcS ] && . /etc/default/rcS
+ 
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+#
+# Function that starts the daemon/service
+#
+do_frontstart()
+{
+	$RUNCMD showvminfo "$VM_NAME"|grep "^State:\s*running" && {
+        	return 0
+	}
+	$RUNCMD showvminfo "$VM_NAME" | grep -q "Could not find a registered machine named '$VM_NAME'" && {
+		# create vm if not exist..
+		$RUNCMD -nologo createvm -name $SHORTNAME -register 
+		MAC=`echo <%= macaddress %> | sed s/://gi`
+		$RUNCMD -nologo modifyvm $SHORTNAME -memory <%= ram %> -vram 1 -accelerate3d off -acpi on -ioapic off -pae off -monitorcount 1 -biosbootmenu disabled -boot1 <%= boot1 %> -boot2 <%= boot2 %> -boot3 <%= boot3 %> -boot4 <%= boot4 %> -cableconnected1 on -nic1 nat -ostype <%= ostype %> -dvd <%= dvd %> -vrdpport <%= vrdpport %>
+		$RUNCMD createvdi -filename $SHORTNAME.vdi -size <%=disksize %> -register
+		$RUNCMD modifyvm $SHORTNAME -hda $SHORTNAME.vdi
+	}
+
+	$RUNCMD startvm "$VM_NAME" -type vrdp 
+	return 0
+}
+
+do_start()
+{
+	$RUNCMD showvminfo "$VM_NAME"|grep "^State:\s*running" >/dev/null && {
+		return 0
+	}
+	$RUNCMD showvminfo "$VM_NAME" | grep -q "Could not find a registered machine named '$VM_NAME'" 1>/dev/null && {
+		$RUNCMD -nologo createvm -name $SHORTNAME -register 
+		MAC=`echo <%= macaddress %> | sed s/://gi`
+		$RUNCMD -nologo modifyvm $SHORTNAME -memory <%= ram %> -vram 1 -accelerate3d off -acpi on -ioapic off -pae off -monitorcount 1 -biosbootmenu disabled -boot1 <%= boot1 %> -boot2 <%= boot2 %> -boot3 <%= boot3 %> -boot4 <%= boot4 %> -cableconnected1 on -nic1 nat -ostype <%= ostype %> -dvd <%= dvd %> -vrdpport <%= vrdpport %>
+		$RUNCMD createvdi -filename $SHORTNAME.vdi -size <%=disksize %> -register
+		$RUNCMD modifyvm $SHORTNAME -hda $SHORTNAME.vdi
+	}
+	$RUNCMD startvm "$VM_NAME" -type vrdp 1>/dev/null 
+	return 0
+}
+ 
+#
+# Function that stops the daemon/service
+#
+do_stop()
+{
+	$RUNCMD showvminfo "$VM_NAME"|grep "^State:\s*running" >/dev/null || {
+		return 0
+	}
+	$RUNCMD controlvm "$VM_NAME" savestate >/dev/null || {
+		return 4
+	}
+	return 0
+}
+ 
+do_poweroff()
+{
+	$RUNCMD showvminfo "$VM_NAME"|grep "^State:\s*running" >/dev/null || {
+		return 0
+	}
+ 
+	$RUNCMD controlvm "$VM_NAME" poweroff >/dev/null || {
+		return 4
+	}
+	return 0
+}
+
+#
+# Display "State" field from showvminfo action
+#
+do_show()
+{
+	$RUNCMD showvminfo "$VM_NAME"
+}
+
+do_returnstatus()
+{
+	OUTPUT=`$RUNCMD showvminfo "$VM_NAME"|grep "^State:\s*.*$"`
+	echo $OUTPUT |grep -q "^State:\s*running" && return 0
+	echo $OUTPUT |grep -q "^State:\s*running" || return 3
+}
+
+do_status()
+{
+	OUTPUT=`$RUNCMD showvminfo "$VM_NAME"|grep "^State:\s*.*$"`
+	echo $OUTPUT
+	echo $OUTPUT |grep -q "^State:\s*running" && {
+		echo -n "Running as PID: "
+		pgrep -f "VBoxHeadless -comment $VM_NAME -startvm"
+		return 0
+	}
+	echo $OUTPUT |grep -q "^State:\s*running" || return 3
+}
+
+# Debugging to see puppet doing status and start on the service all the time
+#echo "----------" >> /tmp/testlog
+#echo $0 >> /tmp/testlog
+#date >> /tmp/testlog
+#echo $* >> /tmp/testlog
+
+case "$1" in
+	show)
+		do_show
+		;;
+	front)
+		log_daemon_msg "Starting $DESC" "$NAME"
+		do_frontstart
+		;;
+	start)
+		log_daemon_msg "Starting $DESC" "$NAME"
+		do_start
+		log_end_msg $? 
+		;;
+	stop)
+		log_daemon_msg "Stopping $DESC" "$NAME"
+		do_stop
+		log_end_msg $? 
+		;;
+	poweroff)
+		log_daemon_msg "Stopping $DESC" "$NAME"
+		do_poweroff
+		log_end_msg $? 
+		;;
+	restart|force-reload)
+		#
+		# If the "reload" option is implemented then remove the
+		# 'force-reload' alias
+		#
+		log_daemon_msg "Restarting $DESC" "$NAME"
+		do_stop
+		case "$?" in
+			3)
+				do_start
+				log_end_msg 3 
+				;;
+			*)
+				# Failed to stop
+				log_end_msg 4;
+				;;
+			esac
+			;;
+	status)
+		do_status
+		log_end_msg $? 
+		;;
+	*)
+	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload|poweroff|status|front|show}" >&2
+	exit 0
+	;;
+esac

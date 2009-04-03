@@ -1,0 +1,6 @@
+
+node 'client.lan' inherits basenetwork {
+        include virtualbox
+        virtualbox::box{ "box1": name=>"box1", runas => "user", vrdpport => "3340", }
+        virtualbox::box{ "box2": name=>"box2", runas => "user2" }
+}
