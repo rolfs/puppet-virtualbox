@@ -1,6 +1,22 @@
+# A mini-howto on how to use:
+cd /etc/puppet/modules
+git clone git://github.com/rolfs/puppet-virtualbox.git
+ln -s puppet-virtualbox virtualbox
 
+#
+# /etc/puppet/manifest/site.pp
+#
+# Define two virtual machines as box1 and box2 running on node client.lan
+#
 node 'client.lan' inherits basenetwork {
         include virtualbox
         virtualbox::box{ "box1": name=>"box1", runas => "user", vrdpport => "3340", }
         virtualbox::box{ "box2": name=>"box2", runas => "user2" }
 }
+
+
+#
+# Puppet Users mailinglist:
+#
+# http://groups.google.com/group/puppet-users/browse_frm/thread/adf8f11f5e5697da
+#
